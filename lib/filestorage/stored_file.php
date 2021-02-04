@@ -1179,36 +1179,78 @@ class stored_file {
         $content = $this->get_content();
         $mimetype = $this->get_mimetype();
 
+        $rotation = [
+            1 => 0,
+            3 => 180,
+            6 => 270,
+            8 => 90,
+        ];
+
+        // If image is of type JPEG and EXIF function are avaliable, attempt rotation.
         if ($mimetype === "image/jpeg" && function_exists("exif_read_data")) {
             $exif = @exif_read_data("data://image/jpeg;base64," . base64_encode($content));
-            if (isset($exif['ExifImageWidth']) && isset($exif['ExifImageLength']) && isset($exif['Orientation'])) {
-                $rotation = [
-                    3 => -180,
-                    6 => -90,
-                    8 => -270,
-                ];
-                $orientation = $exif['Orientation'];
-                if ($orientation !== 1) {
-                    $source = @imagecreatefromstring($content);
-                    $data = @imagerotate($source, $rotation[$orientation], 0);
-                    if (!empty($data)) {
-                        if ($orientation == 1 || $orientation == 3) {
-                            $size = [
-                                'width' => $exif["ExifImageWidth"],
-                                'height' => $exif["ExifImageLength"],
-                            ];
+
+            $rotated = false;
+            $imgwidth = null;
+            $imgheight = null;
+
+            // If ExifImageWidth and ExifImageLength EXIF fields are set, pull width and height
+            // from there, otherwise look for width/height in the 'COMPUTED' array. If no size data
+            // is found we can assume there is something wrong with the image.
+            if (isset($exif['ExifImageWidth']) && isset($exif['ExifImageLength'])) {
+                $imgwidth = $exif['ExifImageWidth'];
+                $imgheight = $exif['ExifImageLength'];
+            } else if (isset($exif['COMPUTED']['Width']) && isset($exif['COMPUTED']['Height'])) {
+                $imgwidth = $exif['COMPUTED']['Width'];
+                $imgheight = $exif['COMPUTED']['Height'];
+            }
+
+            // If width and height data was found, continue with rotation attempt.
+            if (isset($imgwidth) && isset($imgheight)) {
+                // If image orientation is present and valid, attempt rotation.
+                if (
+                    isset($exif['Orientation']) &&
+                    array_key_exists($exif['Orientation'], $rotation)
+                ) {
+                    // Make image object.
+                    $imagedata = @imagecreatefromstring($content);
+
+                    // If image object was created, continue with rotation.
+                    if ($imagedata != false) {
+                        // If orientation is set to 1, no rotation is required, return original content.
+                        if ($exif['Orientation'] === 1) {
+                            $rotated = $imagedata;
                         } else {
-                            $size = [
-                                'height' => $exif["ExifImageWidth"],
-                                'width' => $exif["ExifImageLength"],
-                            ];
+                            // Rotate image - if this fails it returns false.
+                            $rotated = @imagerotate($imagedata, $rotation[$exif['Orientation']], 0);
+
+                            // If orientation is 6 or 8 the width and height data of the image needs
+                            // to be swapped.
+                            if ($exif['Orientation'] == 6 || $exif['Orientation'] == 8) {
+                                $tempvar = $imgwidth;
+                                $imgwidth = $imgheight;
+                                $imgheight = $tempvar;
+                            }
+
+                            // Image object no longer needed.
+                            imagedestroy($imagedata);
                         }
-                        imagedestroy($source);
-                        return [$data, $size];
                     }
                 }
+
+                // Return image and size data. Image data set to false by default and updated if
+                // rotation is successful.
+                $size = [
+                    'width' => $imgwidth,
+                    'height' => $imgheight,
+                ];
+
+                return [$rotated, $size];
             }
         }
+
+        // Image is not JPEG, EXIF functions do not exist or no size data
+        // found - return [false, false].
         return [false, false];
     }
 }

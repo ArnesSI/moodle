@@ -121,12 +121,9 @@ class document_services_test extends advanced_testcase {
         $data = (object) ['files_filemanager' => $submission->id];
         $assign->save_submission($data, $notices);
 
-        // This image was manually rotated to be upside down. Also, Orientation, ExifImageWidth
-        // and ExifImageLength EXIF tags were written into its metadata.
-        // This is needed to make sure that this image will be rotated by stored_file::rotate_image()
-        // and stored as a new rotated file.
-        $filename = 'testimage_rotated.jpg';
-        $filepath = $CFG->dirroot . '/lib/filestorage/tests/fixtures/' . $filename;
+        // The following image has all required EXIF fields set correctly.
+        $filename = 'JPEG3.jpeg';
+        $filepath = $CFG->dirroot . '/lib/filestorage/tests/fixtures/fullEXIF/h/' . $filename;
         $filerecord = [
             'contextid' => $assign->get_context()->id,
             'component' => 'assignsubmission_file',
