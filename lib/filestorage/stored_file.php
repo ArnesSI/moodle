@@ -1162,36 +1162,94 @@ class stored_file {
         $content = $this->get_content();
         $mimetype = $this->get_mimetype();
 
+        $rotation = [
+            1 => 0,
+            3 => -180,
+            6 => -90,
+            8 => -270,
+        ];
+
         if ($mimetype === "image/jpeg" && function_exists("exif_read_data")) {
             $exif = @exif_read_data("data://image/jpeg;base64," . base64_encode($content));
-            if (isset($exif['ExifImageWidth']) && isset($exif['ExifImageLength']) && isset($exif['Orientation'])) {
-                $rotation = [
-                    3 => -180,
-                    6 => -90,
-                    8 => -270,
-                ];
-                $orientation = $exif['Orientation'];
-                if ($orientation !== 1) {
-                    $source = @imagecreatefromstring($content);
-                    $data = @imagerotate($source, $rotation[$orientation], 0);
-                    if (!empty($data)) {
-                        if ($orientation == 1 || $orientation == 3) {
-                            $size = [
-                                'width' => $exif["ExifImageWidth"],
-                                'height' => $exif["ExifImageLength"],
-                            ];
-                        } else {
-                            $size = [
-                                'height' => $exif["ExifImageWidth"],
-                                'width' => $exif["ExifImageLength"],
-                            ];
-                        }
-                        imagedestroy($source);
-                        return [$data, $size];
+
+            if (isset($exif['Orientation']) && $exif['Orientation'] == 1) {
+                // Check if image is "correctly" oriented.
+                return [false, false];
+            }
+
+            $imgwidth = null;
+            $imgheight = null;
+
+            if (isset($exif['ExifImageWidth']) && isset($exif['ExifImageLength'])) {
+                $imgwidth = $exif['ExifImageWidth'];
+                $imgheight = $exif['ExifImageLength'];
+            } else if (isset($exif['COMPUTED']['Width']) && isset($exif['COMPUTED']['Height'])) {
+                $imgwidth = $exif['COMPUTED']['Width'];
+                $imgheight = $exif['COMPUTED']['Height'];
+            }
+
+            if (isset($imgwidth) && isset($imgheight)) {
+                // Image width and height data present.
+                if (isset($exif['Orientation']) && array_key_exists($exif['Orientation'], $rotation)) {
+                    // Orientation key set.
+
+                    $rotated = $this->rotate_image_by_angle(
+                        $content,
+                        $rotation[$exif['Orientation']],
+                        $imgwidth,
+                        $imgheight
+                    );
+
+                    if (isset($rotated)) {
+                        return [
+                            $rotated['image'],
+                            [
+                                'width' => $rotated['width'],
+                                'height' => $rotated['height']
+                            ]
+                        ];
                     }
+                } else {
+                    // Orientation is not set or incorrect.
+
+                    $size = [
+                        'width' => $imgwidth,
+                        'height' => $imgheight,
+                    ];
+
+                    return [false, $size];
                 }
             }
         }
+
         return [false, false];
+    }
+
+    protected function rotate_image_by_angle(string $source, int $angle, int $width, int $height) {
+        $imagedata = @imagecreatefromstring($source);
+
+        if (!$imagedata) {
+            imagedestroy($imagedata);
+            return null;
+        }
+
+        $result = [
+            'image' => $imagedata,
+            'width' => $width,
+            'height' => $height,
+        ];
+
+        if ($angle === -180) {
+            $result['image'] = @imagerotate($result['image'], $angle, 0);
+        }
+
+        if ($angle === -90 || $angle === -270) {
+            $result['width'] = $height;
+            $result['height'] = $width;
+            $result['image'] = @imagerotate($result['image'], $angle, 0);
+        }
+
+        imagedestroy($imagedata);
+        return $result;
     }
 }
