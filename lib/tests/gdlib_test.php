@@ -24,7 +24,7 @@ namespace core;
  * @copyright  2015 Andrew Nicols <andrew@nicols.co.uk>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class gdlib_test extends \basic_testcase {
+class gdlib_test extends \advanced_testcase {
 
     private $fixturepath = null;
 
@@ -144,4 +144,160 @@ class gdlib_test extends \basic_testcase {
         $this->assertEquals('image/png', $imageinfo['mime']);
     }
 
+    /**
+     * Test that the process_new_icon() method correctly rotates and generates an
+     * icon based on the source image EXIF data.
+     *
+     * @covers ::process_new_icon()
+     * @dataProvider icon_images_provider
+     *
+     * @param   int     $controlangle Angle to be used when rotating the control image
+     * @param   string  $imagepath Path to the required image
+     * @param   int   $imageitemid ID of created item
+     */
+    public function test_rotation_process_new_icon(int $controlangle, string $imagepath, int $imageitemid): void {
+        $this->resetAfterTest();
+
+        // Check if required JPEG functions for this test exist.
+        if (!function_exists('imagecreatefromjpeg')) {
+            $this->markTestSkipped('JPEG not supported on this server.');
+        }
+
+        // Check if required EXIF functions for this test exist.
+        if (!function_exists("exif_read_data")) {
+            $this->markTestSkipped('This test requires exif support.');
+        }
+
+        // Check if the given file exists.
+        if (!is_file($imagepath)) {
+            $this->markTestSkipped('Required fixture image does not exist.');
+        }
+
+        // Require libs.
+        global $CFG;
+        require_once($CFG->libdir . '/gdlib.php');
+
+        $fs = get_file_storage();
+
+        // Get image data from given filepath.
+        $imageinfo = getimagesize($imagepath);
+
+        // Save some info in a better format for easier use later.
+        $image = new \stdClass();
+        $image->width  = $imageinfo[0];
+        $image->height = $imageinfo[1];
+
+        if ($controlangle == 90 || $controlangle == 270) {
+            $image->width = $imageinfo[1];
+            $image->height = $imageinfo[0];
+        }
+
+        // Make and rotate a control image to be used for comparison.
+        $control = imagecreatefromjpeg($imagepath);
+        $control = imagerotate($control, $controlangle, 0);
+
+        // Create blank 100x100 image.
+        if (function_exists('imagecreatetruecolor')) {
+            $control1 = imagecreatetruecolor(100, 100);
+        } else {
+            $control1 = imagecreate(100, 100);
+        }
+
+        // Calculate copy coordinates.
+        $cx = floor($image->width / 2);
+        $cy = floor($image->height / 2);
+
+        if ($image->width < $image->height) {
+            $half = floor($image->width / 2.0);
+        } else {
+            $half = floor($image->height / 2.0);
+        }
+
+        // Use imagecopybicubic() to resize control image.
+        imagecopybicubic($control1, $control, 0, 0, $cx - $half, $cy - $half, 100, 100, $half * 2, $half * 2);
+
+        // Stringify control image.
+        ob_start();
+        imagejpeg($control1, null, 90);
+        $contentsexpected = ob_get_clean();
+
+        // Save control image to file system.
+        $fsdata = [
+            'contextid' => \context_user::instance(2, MUST_EXIST)->id,
+            'component' => 'user',
+            'filearea' => 'icon',
+            'itemid' => 100,
+            'filepath' => '/',
+            'filename' => 'f1.jpg',
+        ];
+        $fs->delete_area_files($fsdata['contextid'], $fsdata['component'], $fsdata['filearea'], $fsdata['itemid']);
+        $controlsaved = $fs->create_file_from_string($fsdata, $contentsexpected);
+
+        // Use process_new_icon() function to create a new icon.
+        $iconid = process_new_icon(
+            \context_user::instance(2, MUST_EXIST),
+            'user',
+            'icon',
+            $imageitemid,
+            $imagepath
+        );
+
+        // Assert that $iconid was returned.
+        $this->assertTrue($iconid !== false);
+
+        // Fetch created icon by file ID.
+        $icon = $fs->get_file_by_id($iconid);
+
+        // Stringify control image returned by create_file_from_string.
+        ob_start();
+        imagejpeg(imagecreatefromstring($controlsaved->get_content()), null, 90);
+        $contentsexpected = ob_get_clean();
+
+        // Stringify created icon.
+        ob_start();
+        imagejpeg(imagecreatefromstring($icon->get_content()), null, 90);
+        $contentsactual = ob_get_clean();
+
+        // Assert that icon created with process_new_icon() matches the one created manually.
+        $this->assertEquals($contentsexpected, $contentsactual);
+    }
+
+    /**
+     * Data provider for test_rotation_process_new_icon().
+     *
+     * @return array
+     */
+    public static function icon_images_provider(): array {
+        global $CFG;
+
+        return [
+            [0, $CFG->dirroot . "/lib/filestorage/tests/fixtures/minEXIF/h/JPEG1.jpeg", 1],
+            [180, $CFG->dirroot . "/lib/filestorage/tests/fixtures/minEXIF/h/JPEG3.jpeg", 2],
+            [270, $CFG->dirroot . "/lib/filestorage/tests/fixtures/minEXIF/h/JPEG6.jpeg", 3],
+            [90, $CFG->dirroot . "/lib/filestorage/tests/fixtures/minEXIF/h/JPEG8.jpeg", 4],
+            [0, $CFG->dirroot . "/lib/filestorage/tests/fixtures/minEXIF/v/JPEG1.jpeg", 5],
+            [180, $CFG->dirroot . "/lib/filestorage/tests/fixtures/minEXIF/v/JPEG3.jpeg", 6],
+            [270, $CFG->dirroot . "/lib/filestorage/tests/fixtures/minEXIF/v/JPEG6.jpeg", 7],
+            [90, $CFG->dirroot . "/lib/filestorage/tests/fixtures/minEXIF/v/JPEG8.jpeg", 8],
+            [0, $CFG->dirroot . "/lib/filestorage/tests/fixtures/fullEXIF/h/JPEG1.jpeg", 9],
+            [180, $CFG->dirroot . "/lib/filestorage/tests/fixtures/fullEXIF/h/JPEG3.jpeg", 10],
+            [270, $CFG->dirroot . "/lib/filestorage/tests/fixtures/fullEXIF/h/JPEG6.jpeg", 11],
+            [90, $CFG->dirroot . "/lib/filestorage/tests/fixtures/fullEXIF/h/JPEG8.jpeg", 12],
+            [0, $CFG->dirroot . "/lib/filestorage/tests/fixtures/fullEXIF/v/JPEG1.jpeg", 13],
+            [180, $CFG->dirroot . "/lib/filestorage/tests/fixtures/fullEXIF/v/JPEG3.jpeg", 14],
+            [270, $CFG->dirroot . "/lib/filestorage/tests/fixtures/fullEXIF/v/JPEG6.jpeg", 15],
+            [90, $CFG->dirroot . "/lib/filestorage/tests/fixtures/fullEXIF/v/JPEG8.jpeg", 16],
+            [0, $CFG->dirroot . "/lib/filestorage/tests/fixtures/incorrectEXIF/h/JPEG0.jpeg", 17],
+            [0, $CFG->dirroot . "/lib/filestorage/tests/fixtures/incorrectEXIF/h/JPEG10.jpeg", 18],
+            [0, $CFG->dirroot . "/lib/filestorage/tests/fixtures/incorrectEXIF/h/JPEG0MissingEXIFH.jpeg", 19],
+            [0, $CFG->dirroot . "/lib/filestorage/tests/fixtures/incorrectEXIF/h/JPEG10MissingEXIFH.jpeg", 20],
+            [0, $CFG->dirroot . "/lib/filestorage/tests/fixtures/incorrectEXIF/v/JPEG0.jpeg", 21],
+            [0, $CFG->dirroot . "/lib/filestorage/tests/fixtures/incorrectEXIF/v/JPEG0MissingEXIFH.jpeg", 22],
+            [180, $CFG->dirroot . "/lib/filestorage/tests/fixtures/partEXIF/h/JPEGMissingEXIFH.jpeg", 23],
+            [180, $CFG->dirroot . "/lib/filestorage/tests/fixtures/partEXIF/h/JPEGMissingEXIFW.jpeg", 24],
+            [180, $CFG->dirroot . "/lib/filestorage/tests/fixtures/partEXIF/v/JPEGMissingEXIFH.jpeg", 25],
+            [0, $CFG->dirroot . "/lib/filestorage/tests/fixtures/noEXIF/h/JPEG1.jpeg", 26],
+            [0, $CFG->dirroot . "/lib/filestorage/tests/fixtures/noEXIF/v/JPEG1.jpeg", 27],
+        ];
+    }
 }

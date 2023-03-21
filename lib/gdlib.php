@@ -138,6 +138,34 @@ function process_new_icon($context, $component, $filearea, $itemid, $originalfil
         case IMAGETYPE_JPEG:
             if (function_exists('imagecreatefromjpeg')) {
                 $im = imagecreatefromjpeg($originalfile);
+
+                // If EXIF functions are avaliable, attempt rotation.
+                if (function_exists("exif_read_data")) {
+                    $rotation = [
+                        1 => 0,
+                        3 => 180,
+                        6 => 270,
+                        8 => 90,
+                    ];
+
+                    $exif = @exif_read_data($originalfile);
+
+                    // If image orientation is present, valid and not equal to 1 (no rotation
+                    // required) perform rotation.
+                    if (
+                        isset($exif['Orientation']) &&
+                        array_key_exists($exif['Orientation'], $rotation) &&
+                        $exif['Orientation'] !== 1
+                    ) {
+                        $im = imagerotate($im, $rotation[$exif['Orientation']], 0);
+
+                        // If orientation value is 6 or 8, update image width and height data.
+                        if ($exif['Orientation'] == 6 || $exif['Orientation'] == 8) {
+                            $image->width = $imageinfo[1];
+                            $image->height = $imageinfo[0];
+                        }
+                    }
+                }
             } else {
                 debugging('JPEG not supported on this server');
                 return false;
