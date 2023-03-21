@@ -1101,7 +1101,7 @@ class stored_file {
         global $CFG;
         require_once($CFG->libdir . '/gdlib.php');
 
-        if (empty($width) or empty($height)) {
+        if (empty($width) || empty($height)) {
             return false;
         }
 
@@ -1115,6 +1115,36 @@ class stored_file {
 
         // Create a new image from the file.
         $original = @imagecreatefromstring($content);
+
+        // If image is of type JPEG and EXIF functions are avaliable, attempt rotation.
+        if ($imageinfo[2] == IMAGETYPE_JPEG && function_exists("exif_read_data")) {
+            $rotation = [
+                1 => 0,
+                3 => 180,
+                6 => 270,
+                8 => 90,
+            ];
+
+            $exif = @exif_read_data("data://image/jpeg;base64," . base64_encode($content));
+
+            // If image orientation is present, valid and not equal to 1 (no rotation
+            // required) perform rotation.
+            if (
+                isset($exif['Orientation']) &&
+                array_key_exists($exif['Orientation'], $rotation) &&
+                $exif['Orientation'] !== 1
+            ) {
+                $original = @imagerotate($original, $rotation[$exif['Orientation']], 0);
+
+                // If orientation value is 6 or 8, manually swap image width and height data.
+                if ($exif['Orientation'] == 6 || $exif['Orientation'] == 8) {
+                    $tempvar = $imageinfo[0];
+                    $imageinfo[0] = $imageinfo[1];
+                    $imageinfo[1] = $tempvar;
+                    $imageinfo[3] = "width=\"$imageinfo[0]\" height=\"$imageinfo[1]\"";
+                }
+            }
+        }
 
         // Generate the thumbnail.
         return generate_image_thumbnail_from_image($original, $imageinfo, $width, $height);

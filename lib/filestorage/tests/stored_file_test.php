@@ -321,6 +321,99 @@ class stored_file_test extends advanced_testcase {
     }
 
     /**
+     * Test that the generate_image_thumbnail() method correctly rotates and generates an
+     * image thumbail based on the source image EXIF data.
+     *
+     * @covers ::generate_image_thumbnail()
+     * @dataProvider thumbnail_images_provider
+     *
+     * @param   int  $controlangle Angle to be used when generating a control image
+     * @param   string  $imagefolder Folder that contains the required image
+     * @param   string  $imagename Filename of required image
+     * @param   int   $imageitemid ID of created item
+     */
+    public function test_generate_rotated_image_thumbnail(int $controlangle, string $imagefolder,
+        string $imagename, int $imageitemid): void {
+        $this->resetAfterTest(true);
+        if (!function_exists("exif_read_data")) {
+            $this->markTestSkipped('This test requires exif support.');
+        }
+
+        global $CFG;
+        require_once($CFG->libdir . '/gdlib.php');
+
+        // Get stored file with orientation set to 1.
+        $controlfile = self::get_stored_file($imagefolder, $imagename, $imageitemid);
+        $control = imagecreatefromstring($controlfile->get_content());
+        $controlimageinfo = getimagesizefromstring($controlfile->get_content());
+
+        // Use imagerotate function to get control image with expected rotation.
+        $controlrotated = imagerotate($control, $controlangle, 0);
+
+        if ($controlangle == 90 || $controlangle == 270) {
+            $tempvar = $controlimageinfo[0];
+            $controlimageinfo[0] = $controlimageinfo[1];
+            $controlimageinfo[1] = $tempvar;
+            $controlimageinfo[3] = "width=\"$controlimageinfo[0]\" height=\"$controlimageinfo[1]\"";
+        }
+
+        $controlrotatedthumbnail = generate_image_thumbnail_from_image($controlrotated, $controlimageinfo, 100, 100);
+
+        $thumbnail = $controlfile->generate_image_thumbnail(100, 100);
+
+        // Assert that $thumbnail was returned.
+        $this->assertFalse(empty($thumbnail));
+
+        ob_start();
+        imagejpeg(imagecreatefromstring($controlrotatedthumbnail));
+        $contentsexpected = ob_get_clean();
+
+        ob_start();
+        imagejpeg(imagecreatefromstring($thumbnail));
+        $contentsactual = ob_get_clean();
+
+        // Assert that thumbail created with generate_image_thumbnail() matches the one crated manually.
+        $this->assertEquals($contentsexpected, $contentsactual);
+    }
+
+    /**
+     * Data provider for test_generate_rotated_image_thumbnail().
+     *
+     * @return array
+     */
+    public static function thumbnail_images_provider(): array {
+        return [
+            [0, "minEXIF/h", "JPEG1.jpeg", 1],
+            [180, "minEXIF/h", "JPEG3.jpeg", 2],
+            [270, "minEXIF/h", "JPEG6.jpeg", 3],
+            [90, "minEXIF/h", "JPEG8.jpeg", 4],
+            [0, "minEXIF/v", "JPEG1.jpeg", 5],
+            [180, "minEXIF/v", "JPEG3.jpeg", 6],
+            [270, "minEXIF/v", "JPEG6.jpeg", 7],
+            [90, "minEXIF/v", "JPEG8.jpeg", 8],
+            [0, "fullEXIF/h", "JPEG1.jpeg", 9],
+            [180, "fullEXIF/h", "JPEG3.jpeg", 10],
+            [270, "fullEXIF/h", "JPEG6.jpeg", 11],
+            [90, "fullEXIF/h", "JPEG8.jpeg", 12],
+            [0, "fullEXIF/v", "JPEG1.jpeg", 13],
+            [180, "fullEXIF/v", "JPEG3.jpeg", 14],
+            [270, "fullEXIF/v", "JPEG6.jpeg", 15],
+            [90, "fullEXIF/v", "JPEG8.jpeg", 16],
+            [0, "incorrectEXIF/h", "JPEG0.jpeg", 17],
+            [0, "incorrectEXIF/h", "JPEG10.jpeg", 18],
+            [0, "incorrectEXIF/h", "JPEG0MissingEXIFH.jpeg", 19],
+            [0, "incorrectEXIF/h", "JPEG10MissingEXIFH.jpeg", 20],
+            [0, "incorrectEXIF/v", "JPEG0.jpeg", 21],
+            [0, "incorrectEXIF/v", "JPEG0MissingEXIFH.jpeg", 22],
+            [180, "partEXIF/h", "JPEGMissingEXIFH.jpeg", 23],
+            [180, "partEXIF/h", "JPEGMissingEXIFW.jpeg", 24],
+            [180, "partEXIF/v", "JPEGMissingEXIFH.jpeg", 25],
+            [0, "noEXIF/h", "JPEG1.jpeg", 27],
+            [0, "noEXIF/v", "JPEG1.jpeg", 28],
+        ];
+    }
+
+    /**
      * Ensure that get_content_file_handle returns a valid file handle.
      *
      * @covers ::get_psr_stream
