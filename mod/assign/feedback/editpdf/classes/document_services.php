@@ -1049,9 +1049,11 @@ EOD;
         $pdf->SetAutoPageBreak(false);
         // Width has to be define here to fit into A4 page. Otherwise the image will be inserted with original size.
         if ($orientation == 'P') {
-            $pdf->Image('@' . $file->get_content(), 0, 0, 210);
+            $pdf->Image('@' . $file->get_content(), 0, 0, 210, 0, '', '', '', false, null, '', false, false, 0,
+                false, false, true);
         } else {
-            $pdf->Image('@' . $file->get_content(), 0, 0, 297);
+            $pdf->Image('@' . $file->get_content(), 0, 0, 297, 0, '', '', '', false, null, '', false, false,
+                0, false, false, true);
         }
         $pdf->setPageMark();
         $pdf->save_pdf($tempfile);

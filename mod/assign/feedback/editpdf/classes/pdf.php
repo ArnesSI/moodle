@@ -873,19 +873,19 @@ class pdf extends TcpdfFpdi {
         $this->currentpage++;
         $template = $this->importPage($this->currentpage);
         $size = $this->getTemplateSize($template);
-        $orientation = 'P';
         if ($imageinfo["width"] > $imageinfo["height"]) {
             if ($size['width'] < $size['height']) {
                 $temp = $size['width'];
                 $size['width'] = $size['height'];
                 $size['height'] = $temp;
+                $size['orientation'] = 'L';
             }
-            $orientation = 'L';
         } else if ($imageinfo["width"] < $imageinfo["height"]) {
             if ($size['width'] > $size['height']) {
                 $temp = $size['width'];
                 $size['width'] = $size['height'];
                 $size['height'] = $temp;
+                $size['orientation'] = 'P';
             }
         }
 
@@ -895,10 +895,10 @@ class pdf extends TcpdfFpdi {
         $this->setPrintFooter(false);
         $this->setPrintHeader(false);
 
-        $this->AddPage($orientation, $size);
+        $this->AddPage($size['orientation'], $size);
         $this->SetAutoPageBreak(false, 0);
         $this->Image('@' . $imagecontent, 0, 0, $size['width'], $size['height'],
-            '', '', '', false, null, '', false, false, 0);
+            '', '', '', false, null, '', false, false, 0, false, false, true);
     }
 }
 
