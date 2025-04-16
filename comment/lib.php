@@ -689,6 +689,32 @@ class comment {
     }
 
     /**
+     * Notify about a new comment
+     *
+     * @param string $eventtype
+     * @param string $content
+     * @param stdClass $user
+     */
+    public function notify($eventtype, $content = null, $user = null) {
+        global $DB, $CFG, $USER;
+
+        if (!$user) {
+            $user = $USER;
+        }
+
+        if ($eventtype == 'add' && $this->component == 'assignsubmission_comments') {
+            require_once($CFG->dirroot . '/mod/assign/locallib.php');
+            $course = get_course($this->courseid);
+            $context = context::instance_by_id($this->contextid, IGNORE_MISSING);
+            $info = get_fast_modinfo($course);
+            $cm = $info->get_cm($context->instanceid);
+            $submission = $DB->get_record('assign_submission', ['id' => $this->itemid]);
+            $assign = new assign($context, $cm, $course);
+            return $assign->notify_about_comments($submission, $content, $user);
+        }
+    }
+
+    /**
      * Add a new comment
      *
      * @global moodle_database $DB
@@ -711,6 +737,8 @@ class comment {
         $newcmt->format       = $format;
         $newcmt->userid       = $USER->id;
         $newcmt->timecreated  = $now;
+
+        $this->notify('add', $content, $USER);
 
         // This callback allow module to modify the content of comment, such as filter or replacement
         plugin_callback($this->plugintype, $this->pluginname, 'comment', 'add', array(&$newcmt, $this->comment_param));

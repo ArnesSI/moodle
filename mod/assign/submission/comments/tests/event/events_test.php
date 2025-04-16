@@ -77,16 +77,22 @@ final class events_test extends \advanced_testcase {
         $sink = $this->redirectEvents();
         $comment->add('New comment');
         $events = $sink->get_events();
-        $this->assertCount(1, $events);
-        $event = reset($events);
+        $this->assertCount(2, $events);
+        $event_notification = $events[0];
+        $event_comment = $events[1];
         $sink->close();
 
-        // Checking that the event contains the expected values.
-        $this->assertInstanceOf('\assignsubmission_comments\event\comment_created', $event);
-        $this->assertEquals($context, $event->get_context());
+        // Checking that the notification event contains the expected values.
+        $this->assertInstanceOf('\core\event\notification_sent', $event_notification);
+        $this->assertEquals(\core\context\system::instance(), $event_notification->get_context());
+        $this->assertEventContextNotUsed($event_notification);
+
+        // Checking that the comment event contains the expected values.
+        $this->assertInstanceOf('\assignsubmission_comments\event\comment_created', $event_comment);
+        $this->assertEquals($context, $event_comment->get_context());
         $url = new \moodle_url('/mod/assign/view.php', array('id' => $assign->get_course_module()->id));
-        $this->assertEquals($url, $event->get_url());
-        $this->assertEventContextNotUsed($event);
+        $this->assertEquals($url, $event_comment->get_url());
+        $this->assertEventContextNotUsed($event_comment);
     }
 
     /**
