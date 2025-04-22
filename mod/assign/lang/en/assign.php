@@ -265,6 +265,28 @@ $string['fixrescalednullgradesconfirm'] = 'Are you sure you want to fix erroneou
 $string['fixrescalednullgradesdone'] = 'Grades fixed.';
 $string['gradeactions'] = 'Grade actions';
 $string['gradecanbechanged'] = 'Grade can be changed';
+$string['studentcommentupdatedhtml'] = '{$a->username} has created a comment
+for assignment <i>\'{$a->assignment}\'  at {$a->timeupdated}</i><br /><br />
+It is <a href="{$a->url}">available on the web site</a>.';
+$string['studentcommentupdatedtext'] = '{$a->username} has created a comment
+for assignment \'{$a->assignment}\' at {$a->timeupdated}
+
+It is available here:
+
+    {$a->url}';
+$string['studentcommentupdatedsmall'] = '{$a->username} has created a comment for assignment {$a->assignment}.';
+$string['studentcommentupdatedsms'] = '{$a->username} updated comment on {$a->assignment}: {$a->url}';
+$string['gradercommentupdatedhtml'] = '{$a->username} has created a comment
+for assignment <i>\'{$a->assignment}\'  at {$a->timeupdated}</i><br /><br />
+It is <a href="{$a->url}">available on the web site</a>.';
+$string['gradercommentupdatedtext'] = '{$a->username} has created a comment
+for assignment \'{$a->assignment}\' at {$a->timeupdated}
+
+It is available here:
+
+    {$a->url}';
+$string['gradercommentupdatedsmall'] = '{$a->username} has created a comment for assignment {$a->assignment}.';
+$string['gradercommentupdatedsms'] = '{$a->username} updated comment on {$a->assignment}: {$a->url}';
 $string['gradeitem:submissions'] = 'Submissions';
 $string['gradersubmissionupdatedtext'] = '{$a->username} has updated their assignment submission
 for \'{$a->assignment}\' at {$a->timeupdated}

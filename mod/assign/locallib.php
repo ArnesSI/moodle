@@ -6503,7 +6503,7 @@ class assign {
             $userfrom->lastname = $uniqueidforuser;
             $userfrom->email = $CFG->noreplyaddress;
         } else {
-            $info->username = core_user::get_fullname($userfrom, $context, ['override' => true]);
+            $info->username = core_user::get_fullname($userfrom, $context, ['override' => false]);
         }
 
         // Information about the recipient (for greeting, etc.).
@@ -6764,6 +6764,53 @@ class assign {
                                          'assign_notification',
                                          $submission->timemodified);
             }
+        }
+    }
+
+    /**
+     * Notify teacher and students about comments
+     *
+     * @param stdClass $submission
+     * @param string $content
+     * @param stdClass $user
+     */
+    public function notify_about_comments($submission, $content = null, $user = null) {
+        global $DB, $USER;
+
+        if (!$user) {
+            $user = $USER;
+        }
+
+        $instance = $this->get_instance();
+
+        if ($submission->userid == $user->id) {
+            // Notify teachers.
+            $late = $instance->duedate && ($instance->duedate < time());
+
+            if (!$instance->sendnotifications && !($late && $instance->sendlatenotifications)) {
+                // No need to do anything.
+                return;
+            }
+
+            if ($notifyusers = $this->get_notifiable_users($user->id)) {
+                foreach ($notifyusers as $notifyuser) {
+                    $this->send_notification($user,
+                        $notifyuser,
+                        'gradercommentupdated',
+                        'assign_notification',
+                        time());
+                }
+            }
+
+        } else {
+            // Notify student.
+            $notifyuser = $DB->get_record('user', ['id' => $submission->userid], '*', MUST_EXIST);
+
+            $this->send_notification($user,
+                $notifyuser,
+                'studentcommentupdated',
+                'assign_notification',
+                time());
         }
     }
 
